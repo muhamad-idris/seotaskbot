@@ -96,11 +96,11 @@ HTML_TEMPLATE = """
         <form action="/login" method="POST">
             <div class="form-group">
                 <label>Email Address</label>
-                <input type="email" name="email" value="ceeskamu@gmail.com" required>
+                <input type="email" name="email" placeholder="Masukkan email Anda..." required>
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" name="password" value="OXb8V0n" required>
+                <input type="password" name="password" placeholder="Masukkan password..." required>
             </div>
             <div class="captcha-box">
                 <img src="data:image/jpeg;base64,{{ c2 }}" alt="Main Captcha">
