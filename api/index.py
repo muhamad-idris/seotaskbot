@@ -8,20 +8,26 @@ import time
 
 app = Flask(__name__)
 
-# Global session and data
-# Note: On Vercel, global variables are not persistent across different invocations.
-bot_session = requests.Session()
-bot_data = {
-    "hash_ajax": None,
-    "headers": {
-        'User-Agent': "Mozilla/5.0 (Linux; Android 13; WayDroid x86_64 Device Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/147.0.7727.111 Safari/537.36 SeoTask-App/1.0",
-        'X-App-Token': "fb00fe7980cc43364602105bf4296e455f5a9e818489df3935c8bb92edacf5f0",
-        'X-App-Version': "1.3.3",
-        'X-Device-Id': "pro_2935e3aeab9ff72f",
-        'X-Requested-With': "XMLHttpRequest",
-        'Content-Type': "application/json; charset=utf-8",
+import uuid
+import random
+
+app = Flask(__name__)
+
+def generate_random_device():
+    device_id = f"pro_{uuid.uuid4().hex[:16]}"
+    android_versions = ["11", "12", "13"]
+    ver = random.choice(android_versions)
+    build = f"TQ3A.{random.randint(230000, 230999)}.001"
+    ua = f"Mozilla/5.0 (Linux; Android {ver}; WayDroid x86_64 Device Build/{build}; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/147.0.7727.111 Safari/537.36 SeoTask-App/1.0"
+    return {
+        "device_id": device_id,
+        "user_agent": ua,
+        "app_token": "fb00fe7980cc43364602105bf4296e455f5a9e818489df3935c8bb92edacf5f0",
+        "app_version": "1.3.3"
     }
-}
+
+# Temporary store for initial session before it's bundled into the "data" param
+temp_sessions = {}
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -103,47 +109,104 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    res = bot_session.get("https://seo-task.com/webphone/?pg=login", headers=bot_data['headers'])
+    session_id = str(uuid.uuid4())
+    device = generate_random_device()
+    
+    bot_session = requests.Session()
+    headers = {
+        'User-Agent': device['user_agent'],
+        'X-App-Token': device['app_token'],
+        'X-App-Version': device['app_version'],
+        'X-Device-Id': device['device_id'],
+        'X-Requested-With': "XMLHttpRequest"
+    }
+    
+    res = bot_session.get("https://seo-task.com/webphone/?pg=login", headers=headers)
     bs = BeautifulSoup(res.text, 'html.parser')
-    c1_style = bs.find("div", class_="out-capcha-img-block").get("style")
-    c1_base64 = re.search(r'base64,(.*?)\)', c1_style).group(1)
-    c2_div = bs.find("div", class_="out-capcha-title-img")
-    c2_base64 = re.search(r'base64,(.*?)\)', c2_div.get("style")).group(1) if c2_div else ""
-    bot_data['hash_initial'] = bs.find('input', {'name': 'hash'}).get('value')
-    bot_data['captcha_labels'] = bs.find_all("label", class_="out-capcha-lab")
-    return render_template_string(HTML_TEMPLATE, c1=c1_base64, c2=c2_base64)
+    
+    try:
+        c1_style = bs.find("div", class_="out-capcha-img-block").get("style")
+        c1_base64 = re.search(r'base64,(.*?)\)', c1_style).group(1)
+        c2_div = bs.find("div", class_="out-capcha-title-img")
+        c2_base64 = re.search(r'base64,(.*?)\)', c2_div.get("style")).group(1) if c2_div else ""
+        hash_init = bs.find('input', {'name': 'hash'}).get('value')
+        
+        temp_sessions[session_id] = {
+            "session": bot_session,
+            "device": device,
+            "hash_initial": hash_init,
+            "captcha_labels": [str(l) for l in bs.find_all("label", class_="out-capcha-lab")]
+        }
+        
+        return render_template_string(HTML_TEMPLATE, c1=c1_base64, c2=c2_base64, sid=session_id)
+    except Exception as e:
+        return f"Error loading login page: {e}. Refresh please."
 
 @app.route('/login', methods=['POST'])
 def do_login():
+    sid = request.form.get('sid')
+    if sid not in temp_sessions: return "Session expired. Go back."
+    
+    data = temp_sessions[sid]
+    bot_session = data['session']
+    device = data['device']
     email, password, posisi = request.form.get('email'), request.form.get('password'), request.form.get('captcha_pos')
-    login_payload = [('login', email), ('password', password), ('hash', bot_data['hash_initial']), ('ajax_func', "login")]
+    
+    login_payload = [('login', email), ('password', password), ('hash', data['hash_initial']), ('ajax_func', "login")]
     for x in posisi.split(","):
         idx = int(x.strip()) - 1
-        login_payload.append(('capcha[]', bot_data['captcha_labels'][idx].find("input").get("value")))
+        label_html = data['captcha_labels'][idx]
+        val = BeautifulSoup(label_html, 'html.parser').find("input").get("value")
+        login_payload.append(('capcha[]', val))
     
-    login_headers = bot_data['headers'].copy()
-    login_headers['Content-Type'] = "application/x-www-form-urlencoded; charset=UTF-8"
-    res_login = bot_session.post("https://seo-task.com/webphone/ajax/ajax_login.php", data=login_payload, headers=login_headers)
+    headers = {
+        'User-Agent': device['user_agent'], 'X-App-Token': device['app_token'],
+        'X-Device-Id': device['device_id'], 'Content-Type': "application/x-www-form-urlencoded; charset=UTF-8",
+        'X-Requested-With': "XMLHttpRequest"
+    }
+    
+    res_login = bot_session.post("https://seo-task.com/webphone/ajax/ajax_login.php", data=login_payload, headers=headers)
     
     if "pg=job" in res_login.text:
-        res_dash = bot_session.get("https://seo-task.com/webphone/?pg=job", headers=bot_data['headers'])
+        res_dash = bot_session.get("https://seo-task.com/webphone/?pg=job", headers=headers)
         script_tag = BeautifulSoup(res_dash.text, 'html.parser').find('script', string=re.compile('hash_ajax'))
-        bot_data['hash_ajax'] = re.search(r"hash_ajax = '(.*?)';", script_tag.string).group(1)
-        return "<h1>Login Berhasil!</h1><p>Buka <b><a href='/selesaikantugas'>/selesaikantugas</a></b>.</p>"
+        hash_ajax = re.search(r"hash_ajax = '(.*?)';", script_tag.string).group(1)
+        
+        state = {"phpsessid": bot_session.cookies.get("PHPSESSID"), "hash_ajax": hash_ajax, "device": device, "email": email}
+        state_encoded = base64.b64encode(json.dumps(state).encode()).decode()
+        del temp_sessions[sid]
+        
+        return f"""
+        <h1>Login Berhasil!</h1>
+        <p>Device ID: {device['device_id']}</p>
+        <p>Gunakan link ini (Simpan):</p>
+        <a href='/selesaikantugas?data={state_encoded}'>MULAI TUGAS (STATELESS)</a>
+        """
     return "<h1>Gagal Login</h1>"
 
 @app.route('/selesaikantugas')
 def complete_task():
-    if not bot_data.get('hash_ajax'): return jsonify({"status": False, "error": "Login dulu"})
-    task_url = "https://seo-task.com/webphone/ajax/ajax_views.php"
-    task_req = bot_session.post(task_url, headers=bot_data['headers'], json={"ajax_func": "get_task", "hash_ajax": bot_data['hash_ajax']})
-    task = task_req.json()
-    if task.get('status'):
-        time.sleep(int(task.get('timer', 10)) + 2)
-        comp_payload = {"ajax_func": "complete_task", "id_status": str(task['id_status']), "hash_ajax": bot_data['hash_ajax'], "data_json": json.dumps({"timestamp": int(time.time()*1000), "device_id": "pro_2935e3aeab9ff72f"})}
-        comp_res = bot_session.post(task_url, headers=bot_data['headers'], json=comp_payload)
-        return jsonify(comp_res.json())
-    return jsonify({"status": "Gagal", "message": task.get('mess', 'Tidak ada tugas.')})
+    state_raw = request.args.get('data')
+    if not state_raw: return jsonify({"error": "No data found"})
+    try:
+        state = json.loads(base64.b64decode(state_raw).decode())
+        device = state['device']
+        sess = requests.Session()
+        sess.cookies.set("PHPSESSID", state['phpsessid'])
+        headers = {'User-Agent': device['user_agent'], 'X-App-Token': device['app_token'], 'X-Device-Id': device['device_id'], 'X-Requested-With': "XMLHttpRequest", 'Content-Type': "application/json; charset=utf-8"}
+        
+        task_url = "https://seo-task.com/webphone/ajax/ajax_views.php"
+        task_req = sess.post(task_url, headers=headers, json={"ajax_func": "get_task", "hash_ajax": state['hash_ajax']})
+        task = task_req.json()
+        
+        if task.get('status'):
+            time.sleep(int(task.get('timer', 10)) + 2)
+            comp_payload = {"ajax_func": "complete_task", "id_status": str(task['id_status']), "hash_ajax": state['hash_ajax'], "data_json": json.dumps({"timestamp": int(time.time()*1000), "device_id": device['device_id']})}
+            comp_res = sess.post(task_url, headers=headers, json=comp_payload)
+            return jsonify({"status": "Success", "device": device['device_id'], "res": comp_res.json()})
+        return jsonify({"status": "No Task", "mess": task.get('mess')})
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
     app.run()
