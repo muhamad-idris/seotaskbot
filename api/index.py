@@ -177,10 +177,20 @@ def do_login():
         del temp_sessions[sid]
         
         return f"""
-        <h1>Login Berhasil!</h1>
-        <p>Device ID: {device['device_id']}</p>
-        <p>Gunakan link ini (Simpan):</p>
-        <a href='/selesaikantugas?data={state_encoded}'>MULAI TUGAS (STATELESS)</a>
+        <div style="font-family: 'Outfit', sans-serif; background: #0f172a; color: white; padding: 2rem; border-radius: 20px; max-width: 500px; margin: 50px auto; border: 1px solid #334155;">
+            <h1 style="color: #6366f1;">Login Berhasil! ✅</h1>
+            <p>Identitas Device: <code>{device['device_id']}</code></p>
+            
+            <p>1. Klik link ini untuk mulai tugas:</p>
+            <a href='/selesaikantugas?data={state_encoded}' style="display: inline-block; padding: 10px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 10px; font-weight: bold;">MULAI TUGAS</a>
+            
+            <p>2. Atau simpan data Base64 ini:</p>
+            <textarea readonly style="width: 100%; height: 120px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 10px; padding: 10px; font-family: monospace; font-size: 12px;">{state_encoded}</textarea>
+            <p style="font-size: 13px; color: #64748b;">(Gunakan data ini sebagai parameter <code>?data=...</code> pada URL <code>/selesaikantugas</code>)</p>
+            
+            <br>
+            <a href="/" style="color: #64748b; text-decoration: none; font-size: 14px;">← Kembali ke Login</a>
+        </div>
         """
     return "<h1>Gagal Login</h1>"
 
