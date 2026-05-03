@@ -113,6 +113,10 @@ HTML_TEMPLATE = """
             <button type="submit">Start Session</button>
             <input type="hidden" name="state" value="{{ state }}">
         </form>
+        <div style="margin-top: 2rem; text-align: center; font-size: 0.8rem; color: #64748b; border-top: 1px solid #334155; padding-top: 1rem;">
+            Developed with ❤️ by <br>
+            <span style="color: var(--primary); font-weight: 600; font-size: 1rem;">Muhamad Idris</span>
+        </div>
     </div>
 </body>
 </html>
@@ -194,7 +198,11 @@ def do_login():
             <a href='/selesaikantugas?data={state_encoded}' style="display: inline-block; padding: 10px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 10px; font-weight: bold;">MULAI TUGAS</a>
             <p>2. Atau simpan data Base64 ini:</p>
             <textarea readonly style="width: 100%; height: 120px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 10px; padding: 10px; font-family: monospace; font-size: 12px;">{state_encoded}</textarea>
-            <br><br><a href="/" style="color: #64748b; text-decoration: none; font-size: 14px;">← Kembali</a>
+            <br>
+            <a href="/" style="color: #64748b; text-decoration: none; font-size: 14px;">← Kembali</a>
+            <div style="margin-top: 2rem; text-align: center; font-size: 0.8rem; color: #64748b; border-top: 1px solid #334155; padding-top: 1rem;">
+                Created by <span style="color: #6366f1; font-weight: 600;">Muhamad Idris</span>
+            </div>
         </div>
         """
     return "<h1>Gagal Login</h1>"
