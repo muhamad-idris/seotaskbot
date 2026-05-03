@@ -122,14 +122,37 @@ def index():
     }
     
     res = bot_session.get("https://seo-task.com/webphone/?pg=login", headers=headers)
+    
+    if res.status_code != 200:
+        return f"Server SEO Task Error: {res.status_code}. Cobalah beberapa saat lagi."
+
     bs = BeautifulSoup(res.text, 'html.parser')
     
     try:
-        c1_style = bs.find("div", class_="out-capcha-img-block").get("style")
+        # Cek apakah kita diblokir (biasanya diarahkan ke halaman lain)
+        c1_div = bs.find("div", class_="out-capcha-img-block")
+        hash_input = bs.find('input', {'name': 'hash'})
+
+        if not c1_div or not hash_input:
+            # Jika elemen tidak ditemukan, mungkin IP terkena limit atau sedang maintenance
+            return f"""
+            <h3>Gagal Memuat Halaman Login</h3>
+            <p>Website SEO Task tidak memberikan data captcha/hash. Hal ini biasanya terjadi karena:</p>
+            <ul>
+                <li>IP Server Vercel diblokir sementara (Limit)</li>
+                <li>Website sedang Maintenance</li>
+            </ul>
+            <p><b>Status Code:</b> {res.status_code}</p>
+            <a href="/">Klik disini untuk Coba Lagi</a>
+            """
+
+        c1_style = c1_div.get("style")
         c1_base64 = re.search(r'base64,(.*?)\)', c1_style).group(1)
+        
         c2_div = bs.find("div", class_="out-capcha-title-img")
         c2_base64 = re.search(r'base64,(.*?)\)', c2_div.get("style")).group(1) if c2_div else ""
-        hash_init = bs.find('input', {'name': 'hash'}).get('value')
+        
+        hash_init = hash_input.get('value')
         
         temp_sessions[session_id] = {
             "session": bot_session,
@@ -140,7 +163,7 @@ def index():
         
         return render_template_string(HTML_TEMPLATE, c1=c1_base64, c2=c2_base64, sid=session_id)
     except Exception as e:
-        return f"Error loading login page: {e}. Refresh please."
+        return f"Error Scraping Page: {str(e)}. Silakan Refresh."
 
 @app.route('/login', methods=['POST'])
 def do_login():
