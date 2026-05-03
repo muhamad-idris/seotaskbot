@@ -37,7 +37,7 @@ def generate_random_device():
     }
 
 # Temporary store for initial session before it's bundled into the "data" param
-temp_sessions = {}
+# No more global temp_sessions for Vercel
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -111,6 +111,7 @@ HTML_TEMPLATE = """
                 <input type="text" name="captcha_pos" placeholder="Masukkan posisi..." required>
             </div>
             <button type="submit">Start Session</button>
+            <input type="hidden" name="state" value="{{ state }}">
         </form>
     </div>
 </body>
@@ -119,17 +120,12 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def index():
-    session_id = str(uuid.uuid4())
     device = generate_random_device()
-    
     bot_session = requests.Session()
     headers = {
-        'User-Agent': device['user_agent'],
-        'X-App-Token': device['app_token'],
-        'X-App-Version': device['app_version'],
-        'X-Device-Id': device['device_id'],
-        'X-Requested-With': "XMLHttpRequest",
-        'Content-Type': "application/json; charset=utf-8",
+        'User-Agent': device['user_agent'], 'X-App-Token': device['app_token'],
+        'X-App-Version': device['app_version'], 'X-Device-Id': device['device_id'],
+        'sec-ch-ua-platform': '"Android"', 'X-Requested-With': "XMLHttpRequest"
     }
     
     res = bot_session.get("https://seo-task.com/webphone/?pg=login", headers=headers)
@@ -142,25 +138,29 @@ def index():
         c2_base64 = re.search(r'base64,(.*?)\)', c2_div.get("style")).group(1) if c2_div else ""
         hash_init = bs.find('input', {'name': 'hash'}).get('value')
         
-        temp_sessions[session_id] = {
-            "session": bot_session,
+        # Bundle everything needed for login into a stateless string
+        login_state = {
+            "cookies": bot_session.cookies.get_dict(),
             "device": device,
             "hash_initial": hash_init,
             "captcha_labels": [str(l) for l in bs.find_all("label", class_="out-capcha-lab")]
         }
+        state_encoded = base64.b64encode(json.dumps(login_state).encode()).decode()
         
-        return render_template_string(HTML_TEMPLATE, c1=c1_base64, c2=c2_base64, sid=session_id)
+        return render_template_string(HTML_TEMPLATE, c1=c1_base64, c2=c2_base64, state=state_encoded)
     except Exception as e:
         return f"Error loading login page: {e}. Refresh please."
 
 @app.route('/login', methods=['POST'])
 def do_login():
-    sid = request.form.get('sid')
-    if sid not in temp_sessions: return "Session expired. Go back."
+    state_raw = request.form.get('state')
+    if not state_raw: return "State missing. Go back."
     
-    data = temp_sessions[sid]
-    bot_session = data['session']
+    data = json.loads(base64.b64decode(state_raw).decode())
     device = data['device']
+    bot_session = requests.Session()
+    bot_session.cookies.update(data['cookies'])
+    
     email, password, posisi = request.form.get('email'), request.form.get('password'), request.form.get('captcha_pos')
     
     login_payload = [('login', email), ('password', password), ('hash', data['hash_initial']), ('ajax_func', "login")]
@@ -185,13 +185,17 @@ def do_login():
         
         state = {"phpsessid": bot_session.cookies.get("PHPSESSID"), "hash_ajax": hash_ajax, "device": device, "email": email}
         state_encoded = base64.b64encode(json.dumps(state).encode()).decode()
-        del temp_sessions[sid]
         
         return f"""
-        <h1>Login Berhasil!</h1>
-        <p>Device ID: {device['device_id']}</p>
-        <p>Gunakan link ini (Simpan):</p>
-        <a href='/selesaikantugas?data={state_encoded}'>MULAI TUGAS (STATELESS)</a>
+        <div style="font-family: 'Outfit', sans-serif; background: #0f172a; color: white; padding: 2rem; border-radius: 20px; max-width: 500px; margin: 50px auto; border: 1px solid #334155;">
+            <h1 style="color: #6366f1;">Login Berhasil! ✅</h1>
+            <p>Identitas Device: <code>{device['device_id']}</code></p>
+            <p>1. Klik link ini untuk mulai tugas:</p>
+            <a href='/selesaikantugas?data={state_encoded}' style="display: inline-block; padding: 10px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 10px; font-weight: bold;">MULAI TUGAS</a>
+            <p>2. Atau simpan data Base64 ini:</p>
+            <textarea readonly style="width: 100%; height: 120px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 10px; padding: 10px; font-family: monospace; font-size: 12px;">{state_encoded}</textarea>
+            <br><br><a href="/" style="color: #64748b; text-decoration: none; font-size: 14px;">← Kembali</a>
+        </div>
         """
     return "<h1>Gagal Login</h1>"
 
