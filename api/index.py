@@ -45,7 +45,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SeoTask Bot Vercel</title>
+    <title>SeoTask Bot</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #6366f1; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
@@ -92,7 +92,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h1>SeoTask <span>Vercel</span></h1>
+        <h1>SeoTask <span>Bot</span></h1>
         <form action="/login" method="POST">
             <div class="form-group">
                 <label>Email Address</label>
