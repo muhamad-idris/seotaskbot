@@ -10,21 +10,29 @@ app = Flask(__name__)
 
 import uuid
 import random
+import hashlib
 
 app = Flask(__name__)
 
 def generate_random_device():
-    # Gunakan ID asli yang valid karena server memvalidasi ID ini
-    device_id = "pro_2935e3aeab9ff72f" 
+    # Sekarang kita bisa menggunakan ID acak karena sudah tahu rumusnya!
+    device_id = f"secure_{uuid.uuid4().hex[:16]}"
+    package_name = "com.example.videoload"
+    salt = "seo_task_ge6fdgvskt"
+    
+    # Hitung X-App-Token sesuai algoritma aplikasi asli
+    string_to_hash = f"{device_id}:{package_name}:{salt}"
+    app_token = hashlib.sha256(string_to_hash.encode()).hexdigest()
+    
     android_versions = ["11", "12", "13"]
     ver = random.choice(android_versions)
-    # Randomisasi kecil pada build number agar tidak terlihat identik setiap saat
     build = f"TQ3A.{random.randint(230000, 230999)}.001"
     ua = f"Mozilla/5.0 (Linux; Android {ver}; WayDroid x86_64 Device Build/{build}; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/147.0.7727.111 Safari/537.36 SeoTask-App/1.0"
+    
     return {
         "device_id": device_id,
         "user_agent": ua,
-        "app_token": "fb00fe7980cc43364602105bf4296e455f5a9e818489df3935c8bb92edacf5f0",
+        "app_token": app_token,
         "app_version": "1.3.3"
     }
 
