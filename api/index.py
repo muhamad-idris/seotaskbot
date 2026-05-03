@@ -118,16 +118,25 @@ def index():
         'X-App-Token': device['app_token'],
         'X-App-Version': device['app_version'],
         'X-Device-Id': device['device_id'],
-        'X-Requested-With': "XMLHttpRequest"
+        'sec-ch-ua-platform': '"Android"',
+        'sec-ch-ua': '"Android WebView";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+        'sec-ch-ua-mobile': '?0',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Dest': 'empty',
+        'Referer': 'https://seo-task.com/webphone/?pg=login',
+        'X-Requested-With': "XMLHttpRequest",
+        'Accept': "*/*",
+        'Accept-Language': "en-US,en;q=0.9",
+        'Accept-Encoding': "gzip, deflate, br, zstd"
     }
     
     res = bot_session.get("https://seo-task.com/webphone/?pg=login", headers=headers)
-    
+    print(res.text)
     if res.status_code != 200:
         return f"Server SEO Task Error: {res.status_code}. Cobalah beberapa saat lagi."
 
     bs = BeautifulSoup(res.text, 'html.parser')
-    
     try:
         # Cek apakah kita diblokir (biasanya diarahkan ke halaman lain)
         c1_div = bs.find("div", class_="out-capcha-img-block")
