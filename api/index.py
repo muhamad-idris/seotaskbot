@@ -14,9 +14,11 @@ import random
 app = Flask(__name__)
 
 def generate_random_device():
-    device_id = f"pro_{uuid.uuid4().hex[:16]}"
+    # Gunakan ID asli yang valid karena server memvalidasi ID ini
+    device_id = "pro_2935e3aeab9ff72f" 
     android_versions = ["11", "12", "13"]
     ver = random.choice(android_versions)
+    # Randomisasi kecil pada build number agar tidak terlihat identik setiap saat
     build = f"TQ3A.{random.randint(230000, 230999)}.001"
     ua = f"Mozilla/5.0 (Linux; Android {ver}; WayDroid x86_64 Device Build/{build}; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/147.0.7727.111 Safari/537.36 SeoTask-App/1.0"
     return {
@@ -118,50 +120,19 @@ def index():
         'X-App-Token': device['app_token'],
         'X-App-Version': device['app_version'],
         'X-Device-Id': device['device_id'],
-        'sec-ch-ua-platform': '"Android"',
-        'sec-ch-ua': '"Android WebView";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
-        'sec-ch-ua-mobile': '?0',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Dest': 'empty',
-        'Referer': 'https://seo-task.com/webphone/?pg=login',
         'X-Requested-With': "XMLHttpRequest",
-        'Accept': "*/*",
-        'Accept-Language': "en-US,en;q=0.9",
-        'Accept-Encoding': "gzip, deflate, br, zstd"
+        'Content-Type': "application/json; charset=utf-8",
     }
     
     res = bot_session.get("https://seo-task.com/webphone/?pg=login", headers=headers)
-    print(res.text)
-    if res.status_code != 200:
-        return f"Server SEO Task Error: {res.status_code}. Cobalah beberapa saat lagi."
-
     bs = BeautifulSoup(res.text, 'html.parser')
+    
     try:
-        # Cek apakah kita diblokir (biasanya diarahkan ke halaman lain)
-        c1_div = bs.find("div", class_="out-capcha-img-block")
-        hash_input = bs.find('input', {'name': 'hash'})
-
-        if not c1_div or not hash_input:
-            # Jika elemen tidak ditemukan, mungkin IP terkena limit atau sedang maintenance
-            return f"""
-            <h3>Gagal Memuat Halaman Login</h3>
-            <p>Website SEO Task tidak memberikan data captcha/hash. Hal ini biasanya terjadi karena:</p>
-            <ul>
-                <li>IP Server Vercel diblokir sementara (Limit)</li>
-                <li>Website sedang Maintenance</li>
-            </ul>
-            <p><b>Status Code:</b> {res.status_code}</p>
-            <a href="/">Klik disini untuk Coba Lagi</a>
-            """
-
-        c1_style = c1_div.get("style")
+        c1_style = bs.find("div", class_="out-capcha-img-block").get("style")
         c1_base64 = re.search(r'base64,(.*?)\)', c1_style).group(1)
-        
         c2_div = bs.find("div", class_="out-capcha-title-img")
         c2_base64 = re.search(r'base64,(.*?)\)', c2_div.get("style")).group(1) if c2_div else ""
-        
-        hash_init = hash_input.get('value')
+        hash_init = bs.find('input', {'name': 'hash'}).get('value')
         
         temp_sessions[session_id] = {
             "session": bot_session,
@@ -172,7 +143,7 @@ def index():
         
         return render_template_string(HTML_TEMPLATE, c1=c1_base64, c2=c2_base64, sid=session_id)
     except Exception as e:
-        return f"Error Scraping Page: {str(e)}. Silakan Refresh."
+        return f"Error loading login page: {e}. Refresh please."
 
 @app.route('/login', methods=['POST'])
 def do_login():
@@ -209,20 +180,10 @@ def do_login():
         del temp_sessions[sid]
         
         return f"""
-        <div style="font-family: 'Outfit', sans-serif; background: #0f172a; color: white; padding: 2rem; border-radius: 20px; max-width: 500px; margin: 50px auto; border: 1px solid #334155;">
-            <h1 style="color: #6366f1;">Login Berhasil! ✅</h1>
-            <p>Identitas Device: <code>{device['device_id']}</code></p>
-            
-            <p>1. Klik link ini untuk mulai tugas:</p>
-            <a href='/selesaikantugas?data={state_encoded}' style="display: inline-block; padding: 10px 20px; background: #6366f1; color: white; text-decoration: none; border-radius: 10px; font-weight: bold;">MULAI TUGAS</a>
-            
-            <p>2. Atau simpan data Base64 ini:</p>
-            <textarea readonly style="width: 100%; height: 120px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 10px; padding: 10px; font-family: monospace; font-size: 12px;">{state_encoded}</textarea>
-            <p style="font-size: 13px; color: #64748b;">(Gunakan data ini sebagai parameter <code>?data=...</code> pada URL <code>/selesaikantugas</code>)</p>
-            
-            <br>
-            <a href="/" style="color: #64748b; text-decoration: none; font-size: 14px;">← Kembali ke Login</a>
-        </div>
+        <h1>Login Berhasil!</h1>
+        <p>Device ID: {device['device_id']}</p>
+        <p>Gunakan link ini (Simpan):</p>
+        <a href='/selesaikantugas?data={state_encoded}'>MULAI TUGAS (STATELESS)</a>
         """
     return "<h1>Gagal Login</h1>"
 
